@@ -1,5 +1,7 @@
+
+// controllers.ts
 import { Request, Response } from "express";
-import { ProductListService, TotalSalesService, CategorySalesService } from "../services/getProducts_Ventes";
+import { ProductListService } from "../services/getProducts_Ventes";
 
 const productListService = new ProductListService();
 
@@ -9,53 +11,34 @@ export class ProductListController {
      */
     async getProductsWithSales(req: Request, res: Response): Promise<void> {
         try {
-            const productsWithSales = productListService.getAllProductsWithSales();
+            const productsWithSales = await productListService.getAllProductsWithSales();
             res.status(200).json(productsWithSales);
         } catch (error) {
             res.status(500).json({ message: "Erreur lors de la récupération des produits avec leurs ventes.", error });
         }
     }
-}
-
-const totalSalesService = new TotalSalesService();
-
-export class TotalSalesController {
-    /**
-     * Récupère le coût total des ventes.
-     */
-    async getTotalSales(req: Request, res: Response): Promise<void> {
+    async getMostSoldProducts(req: Request, res: Response): Promise<void> {
         try {
-            const total = totalSalesService.calculateTotalSales();
-            res.status(200).json({ totalSales: total });
+          const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+          const mostSoldProducts = await productListService.getMostSoldProducts(limit);
+          res.status(200).json(mostSoldProducts);
         } catch (error) {
-            res.status(500).json({ message: "Erreur lors du calcul du coût total des ventes.", error });
+          res.status(500).json({ 
+            message: "Erreur lors de la récupération des produits les plus vendus.", 
+            error 
+          });
         }
-    }
-}
+      }
 
-//import { CategorySalesService } from "../services/category-sales.service";
-
-const categorySalesService = new CategorySalesService();
-
-export class CategorySalesController {
-    /**
-     * Récupère les statistiques des ventes par catégorie.
-     */
-    async getCategorySalesStats(req: Request, res: Response): Promise<void> {
+      async getMostSoldCategories(req: Request, res: Response): Promise<void> {
         try {
-            const stats = categorySalesService.calculateCategorySales();
-            const categoryStats = Object.entries(stats.categoryTotals).reduce((acc: Record<string, number>, [category, data]) => {
-                acc[`${category} totale prix`] = data.totalPrice;
-                return acc;
-            }, {});
-
-            res.status(200).json({
-                ...categoryStats,
-                "categorie plus vendu par quantite": stats.maxQuantityCategory.category,
-                "categorie plus vendu par prix": stats.maxPriceCategory.category
-            });
+          const categorySales = await productListService.getMostSoldCategories();
+          res.status(200).json(categorySales);
         } catch (error) {
-            res.status(500).json({ message: "Erreur lors du calcul des statistiques des ventes par catégorie.", error });
+          res.status(500).json({
+            message: "Erreur lors de la récupération des catégories les plus vendues.",
+            error
+          });
         }
-    }
+      }
 }

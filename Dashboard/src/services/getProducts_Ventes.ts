@@ -1,98 +1,102 @@
-import { products, sales, IProduct, ISale } from "../models/getProducts_Ventes";
 
-// Service pour obtenir les produits avec leurs ventes associées
+// services.ts
+import { Product, Sale } from "../models/getProducts_Ventes"
+
 export class ProductListService {
-    /**
-     * Récupère tous les produits avec leurs ventes associées.
-     */
-    getAllProductsWithSales() {
+   
+    async getAllProductsWithSales() {
         try {
-            // Associe chaque produit à ses ventes
-            const productsWithSales = products.map((product: IProduct) => {
-                const productSales = sales.filter((sale: ISale) => sale.ProductID === product.ProductID);
-                return { ...product, sales: productSales };
-            });
+            // 1-get products from database with find() and stored in products
+            const products = await Product.find().lean(); 
+
+     
+            const productsWithSales = await Promise.all(
+                //3- associe a chaque produit son sales avec map
+                products.map(async (product) => {
+                    // 2-get sales from database with find by productID 
+                    const sales = await Sale.find({ ProductID: product.ProductID }).lean();
+                    // 4-retourner tous les produits avec les sales 
+                    return { ...product, sales };
+                })
+            );
 
             return productsWithSales;
         } catch (error) {
             throw new Error("Erreur lors de la récupération des produits avec leurs ventes.");
         }
     }
-}
 
-//import { products, sales, IProduct, ISale } from "../models";
-
-export class TotalSalesService {
-    /**
-     * Calcule le coût total des ventes.
-     */
-    calculateTotalSales() {
+    async getMostSoldProducts(limit?: number) {
         try {
-            // Calcul du total des ventes
-            let totalSales = 0;
-
-            // Pour chaque vente, nous allons récupérer le produit associé et multiplier la quantité par le prix
-            sales.forEach((sale: ISale) => {
-                const product = products.find((product: IProduct) => product.ProductID === sale.ProductID);
-                if (product) {
-                    totalSales += product.Price * sale.Quantity;
-                }
-            });
-
-            return totalSales;
+          // Define the pipeline stages with proper typing
+          const pipeline: any[] = [
+            {
+              $group: {
+                _id: "$ProductID",
+                totalQuantity: { $sum: "$Quantity" }
+              }
+            },
+            { 
+              $sort: { totalQuantity: -1 } 
+            }
+          ];
+    
+          // Add limit stage if specified
+          if (limit) {
+            pipeline.push({ $limit: limit });
+          }
+    
+          const salesAggregation = await Sale.aggregate(pipeline);
+    
+          // Get product details for the aggregated sales
+          const mostSoldProducts = await Promise.all(
+            salesAggregation.map(async (sale) => {
+              const product = await Product.findOne({ ProductID: sale._id }).lean();
+              return {
+                productName: product?.ProductName,
+                productID: sale._id,
+                totalQuantity: sale.totalQuantity,
+                category: product?.Category
+              };
+            })
+          );
+    
+          return mostSoldProducts;
         } catch (error) {
-            throw new Error("Erreur lors du calcul du coût total des ventes.");
+          throw new Error("Erreur lors de la récupération des produits les plus vendus.");
         }
-    }
-}
+      }
 
-
-//import { products, sales, IProduct, ISale } from "../models";
-
-export class CategorySalesService {
-    /**
-     * Calcule le total des ventes par catégorie et la catégorie la plus vendue par quantité et prix.
-     */
-    calculateCategorySales() {
+      async getMostSoldCategories() {
         try {
-            // Initialisation des variables pour stocker les résultats
-            const categoryTotals: { [key: string]: { totalPrice: number, totalQuantity: number } } = {};
-            let maxQuantityCategory = { category: "", quantity: 0 };
-            let maxPriceCategory = { category: "", totalPrice: 0 };
-
-            // Calcul du total des ventes par catégorie
-            sales.forEach((sale: ISale) => {
-                const product = products.find((product: IProduct) => product.ProductID === sale.ProductID);
-                if (product) {
-                    const category = product.Category;
-
-                    // Mettre à jour le total des ventes pour chaque catégorie
-                    if (!categoryTotals[category]) {
-                        categoryTotals[category] = { totalPrice: 0, totalQuantity: 0 };
-                    }
-
-                    categoryTotals[category].totalPrice += product.Price * sale.Quantity;
-                    categoryTotals[category].totalQuantity += sale.Quantity;
-
-                    // Trouver la catégorie la plus vendue par quantité
-                    if (categoryTotals[category].totalQuantity > maxQuantityCategory.quantity) {
-                        maxQuantityCategory = { category, quantity: categoryTotals[category].totalQuantity };
-                    }
-
-                    // Trouver la catégorie la plus vendue par prix
-                    if (categoryTotals[category].totalPrice > maxPriceCategory.totalPrice) {
-                        maxPriceCategory = { category, totalPrice: categoryTotals[category].totalPrice };
-                    }
-                }
-            });
-
-            return {
-                categoryTotals,
-                maxQuantityCategory,
-                maxPriceCategory
-            };
+          // Get all products with their sales
+          const products = await Product.find().lean();
+          const categorySales = new Map<string, number>();
+    
+          // Get all sales for each product and aggregate by category
+          await Promise.all(
+            products.map(async (product) => {
+              const sales = await Sale.find({ ProductID: product.ProductID }).lean();
+              const totalQuantity = sales.reduce((sum, sale) => sum + sale.Quantity, 0);
+              
+              // Add quantity to category total
+              const currentTotal = categorySales.get(product.Category) || 0;
+              categorySales.set(product.Category, currentTotal + totalQuantity);
+            })
+          );
+    
+          // Convert Map to array and sort by quantity in descending order
+          const sortedCategories = Array.from(categorySales.entries()).map(([category, totalQuantity]) => ({
+            category,
+            totalQuantity
+          })).sort((a, b) => b.totalQuantity - a.totalQuantity);
+    
+          return sortedCategories;
         } catch (error) {
-            throw new Error("Erreur lors du calcul des ventes par catégorie.");
+          throw new Error("Erreur lors de la récupération des catégories les plus vendues.");
         }
-    }
+      }
+
+
+      
 }
