@@ -98,5 +98,113 @@ export class ProductListService {
       }
 
 
-      
+      async getProductsByDateRange(startDate: string, endDate: string) {
+        try {
+          // Find all sales within the date range
+          const sales = await Sale.find({
+            Date: {
+              $gte: new Date(startDate),
+              $lte: new Date(`${endDate}T23:59:59.999Z`)
+            }
+          }).lean();
+    
+          // Get unique product IDs from the sales
+          const productIds = [...new Set(sales.map(sale => sale.ProductID))];
+    
+          // Get the product details for these sales
+          const products = await Product.find({
+            ProductID: { $in: productIds }
+          }).lean();
+    
+          // Map products with their sales for the specified date range
+          const productsWithSales = products.map(product => {
+            const productSales = sales.filter(sale => 
+              sale.ProductID === product.ProductID
+            );
+    
+            return {
+              ...product,
+              sales: productSales,
+              totalQuantity: productSales.reduce((sum, sale) => sum + sale.Quantity, 0),
+              totalAmount: productSales.reduce((sum, sale) => sum + sale.TotalAmount, 0)
+            };
+          });
+    
+          return productsWithSales;
+        } catch (error) {
+          throw new Error("Erreur lors de la récupération des produits par période.");
+        }
+      }
+      async getProductsByDateRangeOptimized(startDate: string, endDate: string) {
+        try {
+          const products = await Sale.aggregate([
+            {
+              $match: {
+                Date: {
+                  $gte: new Date(startDate),
+                  $lte: new Date(`${endDate}T23:59:59.999Z`)
+                }
+              }
+            },
+            {
+              $lookup: {
+                from: 'products',
+                localField: 'ProductID',
+                foreignField: 'ProductID',
+                as: 'product'
+              }
+            },
+            {
+              $unwind: '$product'
+            },
+            {
+              $group: {
+                _id: '$ProductID',
+                productDetails: { $first: '$product' },
+                sales: { $push: '$$ROOT' },
+                totalQuantity: { $sum: '$Quantity' },
+                totalAmount: { $sum: '$TotalAmount' }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                ProductID: '$_id',
+                ProductName: '$productDetails.ProductName',
+                Category: '$productDetails.Category',
+                Price: '$productDetails.Price',
+                sales: 1,
+                totalQuantity: 1,
+                totalAmount: 1
+              }
+            },
+            {
+              $sort: { totalQuantity: -1 } // Sort by quantity sold, descending
+            }
+          ]);
+    
+          return products;
+        } catch (error) {
+          throw new Error("Erreur lors de la récupération des produits par période.");
+        }
+      }
+      async getSalesDateRange() {
+        try {
+            // Get the smallest and largest dates from the Sales collection
+            const smallestSale = await Sale.findOne().sort({ Date: 1 }).select("Date");
+            const biggestSale = await Sale.findOne().sort({ Date: -1 }).select("Date");
+
+            if (!smallestSale || !biggestSale) {
+                throw new Error("Aucune donnée de vente trouvée.");
+            }
+
+            // Return the smallest and biggest dates
+            return {
+                smallestDate: smallestSale.Date,
+                biggestDate: biggestSale.Date,
+            };
+        } catch (error) {
+            throw new Error("Erreur lors de la récupération de la plage de dates des ventes.");
+        }
+    }
 }

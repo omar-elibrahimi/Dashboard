@@ -41,4 +41,63 @@ export class ProductListController {
           });
         }
       }
+
+      async getProductsByDateRange(req: Request, res: Response): Promise<void> {
+        try {
+          const { startDate, endDate } = req.params;
+          
+          // Validate date format
+          const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+          if (!startDate || !endDate || !dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+            res.status(400).json({
+              message: "Format de date invalide. Utilisez le format YYYY-MM-DD"
+            });
+            return;
+          }
+    
+          // Validate date range
+          if (new Date(startDate) > new Date(endDate)) {
+            res.status(400).json({
+              message: "La date de début doit être antérieure à la date de fin"
+            });
+            return;
+          }
+    
+          // Using the optimized version
+          const productsWithSales = await productListService.getProductsByDateRangeOptimized(
+            startDate, 
+            endDate
+          );
+          
+          res.status(200).json({
+            dateRange: {
+              from: startDate,
+              to: endDate
+            },
+            products: productsWithSales,
+            summary: {
+              totalProducts: productsWithSales.length,
+              totalQuantitySold: productsWithSales.reduce((sum, p) => sum + p.totalQuantity, 0),
+              totalRevenue: productsWithSales.reduce((sum, p) => sum + p.totalAmount, 0)
+            }
+          });
+        } catch (error) {
+          res.status(500).json({
+            message: "Erreur lors de la récupération des produits par période.",
+            error
+          });
+        }
+      }
+
+      async getSalesDateRange(req: Request, res: Response): Promise<void> {
+        try {
+            const salesDateRange = await productListService.getSalesDateRange();
+            res.status(200).json(salesDateRange);
+        } catch (error) {
+            res.status(500).json({ 
+                message: "Erreur lors de la récupération de la plage de dates des ventes.", 
+                
+            });
+        }
+    }
 }
