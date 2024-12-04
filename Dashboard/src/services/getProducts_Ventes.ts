@@ -207,4 +207,41 @@ export class ProductListService {
             throw new Error("Erreur lors de la récupération de la plage de dates des ventes.");
         }
     }
+
+    async getSalesByDateRange(startDate: Date, endDate: Date) {
+      try {
+          // Find all sales within the date range
+          const sales = await Sale.find({
+              Date: { $gte: startDate, $lte: endDate }
+          }).sort({ Date: 1 });
+
+          // Get all unique product IDs from the sales
+          const productIds = [...new Set(sales.map((sale) => sale.ProductID))];
+
+          // Fetch all products in one query
+          const products = await Product.find({
+              ProductID: { $in: productIds }
+          });
+
+          // Create a map for quick product lookup
+          const productMap = new Map(
+              products.map((product) => [product.ProductID, product])
+          );
+
+          // Combine sale and product information
+          return sales.map((sale) => {
+              const product = productMap.get(sale.ProductID);
+              return {
+                  SaleID: sale.SaleID,
+                  ProductName: product ? product.ProductName : "Unknown Product",
+                  Quantity: sale.Quantity,
+                  Price: product ? product.Price : 0,
+                  TotalAmount: sale.TotalAmount,
+                  Date: sale.Date
+              };
+          });
+      } catch (error) {
+          throw new Error(`Error fetching sales:`);
+      }
+  }
 }

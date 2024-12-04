@@ -5,8 +5,9 @@
     <ChartComponent />
     <CategoryComponent />
     <ProductSalesReport />
-    <!-- app.vue <ProductList />-->
+    <ProductList />
     <CategoryPercentageComponent />
+    <TotalSalesReport />
   </div>
 </template>
 
@@ -15,7 +16,8 @@ import ChartComponent from "./ChartComponent.vue";
 import CategoryComponent from "./CategoryComponent.vue";
 import ProductSalesReport from "./ProductSalesReport.vue";
 import CategoryPercentageComponent from "./CategoryPercentageComponent.vue";
-//import ProductList from "./ProductList.vue";
+import TotalSalesReport from "./TotalSalesReport.vue"
+import ProductList from "./ProductList.vue";
 export default {
   name: "App",
   components: {
@@ -23,7 +25,8 @@ export default {
     CategoryComponent,
     ProductSalesReport,
     CategoryPercentageComponent,
-    //ProductList
+    TotalSalesReport,
+    ProductList
   },
 };
 </script>

@@ -22,4 +22,9 @@ router.get("/categories/most-sold", (req, res) =>
   router.get("/sales/date-range", (req, res) => 
     productListController.getSalesDateRange(req, res)
 );
+router.get(
+  "/sales/range",
+  (req, res) => productListController.getSalesByDateRange(req, res)
+);
+
 export default router;

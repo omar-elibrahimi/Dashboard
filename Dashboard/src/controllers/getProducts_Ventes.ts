@@ -100,4 +100,58 @@ export class ProductListController {
             });
         }
     }
+
+   
+    async getSalesByDateRange(req: Request, res: Response): Promise<void> {
+      try {
+          const { startDate, endDate } = req.query;
+
+          // Validate date format
+          const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+          if (!startDate || !endDate || !dateRegex.test(startDate as string) || !dateRegex.test(endDate as string)) {
+              res.status(400).json({
+                  message: "Invalid date format. Please use YYYY-MM-DD."
+              });
+              return;
+          }
+
+          // Validate date range
+          if (new Date(startDate as string) > new Date(endDate as string)) {
+              res.status(400).json({
+                  message: "Start date must be earlier than end date."
+              });
+              return;
+          }
+
+          // Fetch sales within the date range
+          const salesWithDetails = await productListService.getSalesByDateRange(
+              new Date(startDate as string),
+              new Date(endDate as string)
+          );
+
+          // Calculate summary
+          const summary = salesWithDetails.reduce(
+              (acc, sale) => {
+                  acc.totalQuantitySold += sale.quantity;
+                  acc.totalRevenue += sale.totalAmount;
+                  return acc;
+              },
+              { totalQuantitySold: 0, totalRevenue: 0 }
+          );
+
+          res.status(200).json({
+              dateRange: {
+                  from: startDate,
+                  to: endDate
+              },
+              sales: salesWithDetails,
+              summary
+          });
+      } catch (error) {
+          res.status(500).json({
+              message: "Error fetching sales by date range.",
+              
+          });
+      }
+  }
 }
